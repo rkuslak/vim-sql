@@ -7,7 +7,7 @@
 
     Intended to be used with models returned from the vim_sql.models class.
 '''
-# import vim
+import vim
 
 
 def createscratchbuffer(parentname):
@@ -38,7 +38,7 @@ def getscratchbuffer(parentname):
 def isactive(state):
     ''' Returns formatted string based on if passed state is active or not '''
     if state:
-        return "↘ "
+        return "-↘ "
     return "  "
 
 
@@ -47,17 +47,33 @@ def formatdatabaselist(databases):
         view of them.
     '''
     results = ""
-    # Indent 0
+
     for database in databases:
-        # results += database["database"] + '\n'
         results += isactive(database.active) + database.name + "\n"
         if database.active:
             # Display table records:
             for table in database.tables:
-                results += "  " + isactive(table.active) + table.name + "\n"
+                results += "  {}{}\n".format(isactive(table.active), table.name)
                 if table.active:
                     for column in table.columns:
                         results += "      {} [{}]\n".format(column.name,
                                                             column.sqltype)
 
     return results
+
+
+def currentbufferdatabases():
+    buffer = vim.current.buffer
+    try:
+        buffer.connection
+    except:
+        buffer.connection = None
+
+    if not buffer.connection:
+        server = buffer.vars.get("vim_sql_server") or None
+        database = buffer.vars.get("vim_sql_database") or None
+        username = buffer.vars.get("vim_sql_username") or None
+        password = buffer.vars.get("vim_sql_password") or None
+        buffer.connection = db.mssql.sqlrunner(server, database, username, password)
+
+    print(formatdatabaselist(buffer.connection.getdatabases()))
