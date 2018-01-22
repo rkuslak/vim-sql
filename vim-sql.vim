@@ -29,7 +29,7 @@ if VIM_SQL_SCRIPT_PATH not in sys.path:
     sys.path += [VIM_SQL_SCRIPT_PATH]
 py3eof
 
-exec "py3file ". g:vim_sql_script_path. "\\vimbackend.py"
+exec "py3file ". g:vim_sql_script_path. "\\vim-sql.py"
 
 " Add commands we can keybind, to make life easier:
-command! VimSqlServers py3 vimbackend.show_database_list() 
+command! VimSqlServers py3 vimsql.show_database_list() 

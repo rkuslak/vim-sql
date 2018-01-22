@@ -13,41 +13,12 @@ import db.mssql
 import vim
 
 
-class vimbackend(object):
-    ''' Logic for Vim-SQL to deal with Vim buffers '''
+class vimsql(object):
 
-    VIM_SQL_CONNECTIONS = {}
-    VIM_SQL_LIST_BUFFERS = {}
-    VIM_SQL_RESULTS_BUFFERS = {}
-
-
-    @staticmethod
-    def getconfigvar(var):
-        ''' Searches the Vim variables for first the buffer, then global, for
-            passed variable name. Returns None if not found.
-        '''
-        return vim.current.buffer.vars.get(var) or vim.vars.get(var) or None
-
-
-    @staticmethod
-    def get_dblist_buffer(bufn):
-        ''' Returns the database list for a buffer passed, if a editor window, or
-            for the connection if passed a list or results buffer
-        '''
-        if bufn in VIM_SQL_CONNECTIONS.keys():
-            return VIM_SQL_CONNECTIONS[bufn]
-
-        if bufn in VIM_SQL_LIST_BUFFERS.values():
-            return bufn
-
-        if bufn in VIM_SQL_RESULTS_BUFFERS.values():
-            # It is a results buffer, find the parent buffer and return list buffer
-            # if it exists:
-            for key in VIM_SQL_RESULTS_BUFFERS.keys():
-                if VIM_SQL_RESULTS_BUFFERS[key] == bufn:
-                    return getlistbufferforbuffer(key)
-
-        return None
+    # XXX: No longer globals. Reformat you fool!
+    CONNECTIONS = {}
+    LIST_BUFFERS = {}
+    RESULTS_BUFFERS = {}
 
     @staticmethod
     def createscratchbuffer(parentname):
@@ -64,7 +35,7 @@ class vimbackend(object):
         pass
 
     @staticmethod
-    def updated_database_list(databases):
+    def get_formated_database_list(databases):
         ''' Takes passed list of db.models objects and creates a plesant
             textual view of them.
         '''
@@ -76,7 +47,7 @@ class vimbackend(object):
             '''
             if state:
                 return "- "
-            return "* "
+            return "  "
 
         for database in databases:
             results += isactive(database.active) + database.name + "\n"
@@ -93,21 +64,22 @@ class vimbackend(object):
         return results
 
     @staticmethod
-    def get_current_buffer_connection():
-        ''' Returns a db.sqlRunner object for the current buffer '''
+    def get_connection():
+        ''' Returns db.sqlRunner object for current buffer. '''
+        connection = None
         buffer = vim.current.buffer
 
         # Attempt to find a conncetion for this buffer in the global cache:
-        if buffer.number not in VIM_SQL_CONNECTIONS.keys():
-            connection = db.mssql.sqlrunner(server, database, username,
-                                            password)
-            VIM_SQL_CONNECTIONS[buffer.number] = connection
+        if buffer.number not in vimsql.CONNECTIONS.keys():
+            connection = db.mssql.sqlrunner()
+            vimsql.CONNECTIONS[buffer.number] = connection
 
-        connection = VIM_SQL_CONNECTIONS[buffer.number]
-        connection.server = getconfigvar("vim_sql_server")
-        connection.database = getconfigvar("vim_sql_database")
-        connection.username = getconfigvar("vim_sql_username")
-        connection.password = getconfigvar("vim_sql_password")
+        connection = vimsql.CONNECTIONS[buffer.number]
+        connection.server = vimsql.getconfigvar("vim_sql_server")
+        connection.database = vimsql.getconfigvar("vim_sql_database")
+        connection.username = vimsql.getconfigvar("vim_sql_username")
+        connection.password = vimsql.getconfigvar("vim_sql_password")
+
         return connection
 
     @staticmethod
@@ -116,9 +88,26 @@ class vimbackend(object):
             buffer for the currently selected buffer to the values held in a
             query against the database.
         '''
-        connection = vimbackend.get_current_buffer_connection()
-
+        connection = vimsql.get_connection()
         databases = connection.getdatabases()
-        print(vimbackend.formatdatabaselist(databases))
+        print(vimsql.get_formated_database_list(databases))
 
+    @staticmethod
+    def get_dblist_buffer(parentbuff):
+        ''' Returns the database list for a buffer passed, if a editor window, or
+            for the connection if passed a list or results buffer
+        '''
+        if parentbuff in vimsql.CONNECTIONS.keys():
+            return vimsql.CONNECTIONS[parentbuff]
 
+        if parentbuff in vimsql.LIST_BUFFERS.values():
+            return parentbuff
+
+        if parentbuff in vimsql.RESULTS_BUFFERS.values():
+            # It is a results buffer, find the parent buffer and return list
+            # buffer if it exists:
+            for key in vimsql.RESULTS_BUFFERS.keys():
+                if vimsql.RESULTS_BUFFERS[key] == parentbuff:
+                    return vimsql.get_dblist_buffer(key)
+
+        return None
