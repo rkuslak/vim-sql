@@ -20,15 +20,20 @@ class vimsql(object):
     LIST_BUFFERS = {}
     RESULTS_BUFFERS = {}
 
+    ResultsBuff = None
+    DBListBuff = None
+
     @staticmethod
     def get_vim_variable(var):
-        result = None
+        ''' Returns the value of the passed name Vim variable from buffer
+            scope, global scope, or None if it can not be found in either.
 
+        '''
         result = vim.current.buffer.vars.get(var) or vim.vars.get(var) or None
         return result
 
     @staticmethod
-    def createscratchbuffer(parentname):
+    def show_dblist_window():
         ''' Create a Vim 'results' scratch buffer for the buffer named in
             parentname.
 
@@ -39,7 +44,37 @@ class vimsql(object):
                 :setlocal noswapfile
                 :autocmd BufEnter results_buffer_name stopinsert
         '''
-        pass
+        # TODO: Make this configurable?
+        width = 20
+
+        if not vimsql.DBListBuff:
+            vim.command("topleft vertical " + str(width) + " new")
+            vim.command("edit VimSqlServerList")
+            vim.command("setlocal buftype=nofile")
+            vim.command("setlocal bufhidden=hide")
+            vim.command("setlocal noswapfile")
+            vimsql.DBListBuff = vim.current.buffer.number
+        else:
+            if not vimsql.get_buffer(vimsql.DBListBuff):
+                # We set the buffer, but it is no longer in existance.
+                # Recreate the buffer and return.
+                vimsql.DBListBuff = None
+                vimsql.show_dblist_window()
+                return
+            vim.command("topleft vertical " + str(width) + " vsplit")
+            vim.command("b " + str(vimsql.DBListBuff))
+
+    def show_results_window():
+        height = 10
+
+        if not vimsql.ResultsBuff:
+            parentbuff = vim.current.buffer.number
+            vim.exec("belowright " + height + " new")
+            vim.exec("edit VimSqlResults" + parentbuff)
+            vimsql.ResultsBuff = vim.current.buffer.number
+        else:
+            vim.exec("belowright " + height + " split")
+            vim.exec("b " + vimsql.ResultsBuff)
 
     @staticmethod
     def get_formated_database_list(databases):
@@ -90,14 +125,25 @@ class vimsql(object):
         return connection
 
     @staticmethod
+    def get_buffer(buffnbr):
+        for buffer in vim.buffers:
+            if buffer.number == buffnbr:
+                return buffer
+        return None
+
+    @staticmethod
     def show_database_list():
         ''' Sets (or creates if non-existant) the contents of the database list
             buffer for the currently selected buffer to the values held in a
             query against the database.
         '''
+        # TODO: Need to see if already shown and reuse tab.
+        vimsql.show_dblist_window()
         connection = vimsql.get_connection()
         databases = connection.getdatabases()
-        print(vimsql.get_formated_database_list(databases))
+
+        listbuff = vimsql.get_buffer(vimsql.DBListBuff)
+        listbuff[:] = vimsql.get_formated_database_list(databases).split("\n")
 
     @staticmethod
     def get_dblist_buffer(parentbuff):
