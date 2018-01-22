@@ -45,14 +45,14 @@ class vimsql(object):
                 :autocmd BufEnter results_buffer_name stopinsert
         '''
         # TODO: Make this configurable?
-        width = 20
+        width = 30
 
         if not vimsql.DBListBuff:
             vim.command("topleft vertical " + str(width) + " new")
             vim.command("edit VimSqlServerList")
             vim.command("setlocal buftype=nofile")
             vim.command("setlocal bufhidden=hide")
-            vim.command("setlocal noswapfile")
+            vim.command("setlocal noswapfile shiftwidth=2")
             vimsql.DBListBuff = vim.current.buffer.number
         else:
             if not vimsql.get_buffer(vimsql.DBListBuff):
@@ -61,8 +61,12 @@ class vimsql(object):
                 vimsql.DBListBuff = None
                 vimsql.show_dblist_window()
                 return
-            vim.command("topleft vertical " + str(width) + " vsplit")
-            vim.command("b " + str(vimsql.DBListBuff))
+            if vim.eval("bufwinnr(" + str(vimsql.DBListBuff) + ")") == "-1":
+                # Buffer exists, but is not shown on this tab. Fix that...
+                vim.command("topleft vertical " + str(width) + " vsplit")
+                vim.command("b " + str(vimsql.DBListBuff))
+
+            print(vim.eval("bufwinnr(" + str(vimsql.DBListBuff) + ")"))
 
     def show_results_window():
         height = 10
@@ -83,25 +87,16 @@ class vimsql(object):
         '''
         results = ""
 
-        def isactive(state):
-            ''' Returns formatted string based on if passed state is active or
-                not
-            '''
-            if state:
-                return "- "
-            return "  "
-
         for database in databases:
-            results += isactive(database.active) + database.name + "\n"
+            results += "* {}\n".format(database.name)
             if database.active:
                 # Display table records:
                 for table in database.tables:
-                    results += "  {}{}\n".format(isactive(table.active),
-                                                 table.name)
+                    results += "  - {}\n".format(table.name)
                     if table.active:
                         for column in table.columns:
-                            results += "      {} [{}]\n".format(column.name,
-                                                                column.sqltype)
+                            results += "    {} [{}]\n".format(column.name,
+                                                              column.sqltype)
 
         return results
 
