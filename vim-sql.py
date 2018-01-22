@@ -21,6 +21,13 @@ class vimsql(object):
     RESULTS_BUFFERS = {}
 
     @staticmethod
+    def get_vim_variable(var):
+        result = None
+
+        result = vim.current.buffer.vars.get(var) or vim.vars.get(var) or None
+        return result
+
+    @staticmethod
     def createscratchbuffer(parentname):
         ''' Create a Vim 'results' scratch buffer for the buffer named in
             parentname.
@@ -75,10 +82,10 @@ class vimsql(object):
             vimsql.CONNECTIONS[buffer.number] = connection
 
         connection = vimsql.CONNECTIONS[buffer.number]
-        connection.server = vimsql.getconfigvar("vim_sql_server")
-        connection.database = vimsql.getconfigvar("vim_sql_database")
-        connection.username = vimsql.getconfigvar("vim_sql_username")
-        connection.password = vimsql.getconfigvar("vim_sql_password")
+        connection.server = vimsql.get_vim_variable("vim_sql_server")
+        connection.database = vimsql.get_vim_variable("vim_sql_database")
+        connection.username = vimsql.get_vim_variable("vim_sql_username")
+        connection.password = vimsql.get_vim_variable("vim_sql_password")
 
         return connection
 
