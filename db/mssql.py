@@ -41,6 +41,8 @@ class sqlrunner(object):
 
     def setdatabase(self, database):
         ''' Changes Sql instance to database value of class. '''
+        # TODO: this is unneeded as we've changed the connection model.
+        #   ensure we're not calling it and remove.
         self.database = database
 
         with self.connect() as sql:
@@ -93,33 +95,33 @@ class sqlrunner(object):
                 cursor.execute("SELECT DB_NAME(3) AS dbname")
 
                 cursor.execute("USE [" + database + "]")
-                cursor.execute("SELECT TABLE_NAME FROM " +
+                cursor.execute("SELECT TABLE_SCHEMA, TABLE_NAME FROM " +
                                "INFORMATION_SCHEMA.TABLES WHERE " +
                                "TABLE_TYPE = 'BASE TABLE'",
                                {"database": database})
 
                 for table in cursor.fetchall():
                     tablename = table["TABLE_NAME"]
-                    columns = self.getcolumns(database, tablename)
-                    tables += [models.table(tablename, columns)]
+                    schema = table["TABLE_SCHEMA"]
+                    columns = self.getcolumns(database, tablename, schema)
+                    tables += [models.table(tablename, schema, columns)]
 
         return tables
 
-    def getcolumns(self, database, table):
+    def getcolumns(self, database, table, schema):
         ''' Returns the columns for table within database passed '''
         columns = []
 
         with self.connect() as sql:
             with sql.cursor() as cursor:
-                cursor.execute("SELECT DB_NAME(3) AS dbname")
-
                 cursor.execute("USE [" + database + "]")
                 cursor.execute("SELECT COLUMN_NAME AS [Column], "
                                "IS_NULLABLE AS [Nullable], "
                                "DATA_TYPE AS Datatype "
                                "FROM INFORMATION_SCHEMA.COLUMNS "
-                               "WHERE TABLE_NAME LIKE @table",
-                               {"table": table})
+                               "WHERE TABLE_NAME LIKE @table AND "
+                               "    TABLE_SCHEMA LIKE @schema",
+                               {"table": table, "schema": schema})
                 for row in cursor.fetchall():
                     columnname = row["Column"]
                     nullable = row["Nullable"] == 'YES'

@@ -52,7 +52,8 @@ class vimsql(object):
             vim.command("edit VimSqlServerList")
             vim.command("setlocal buftype=nofile")
             vim.command("setlocal bufhidden=hide")
-            vim.command("setlocal noswapfile shiftwidth=2")
+            vim.command("setlocal noswapfile")
+            vim.command("setlocal shiftwidth=2")
             vimsql.DBListBuff = vim.current.buffer.number
         else:
             if not vimsql.get_buffer(vimsql.DBListBuff):
@@ -68,7 +69,9 @@ class vimsql(object):
 
             print(vim.eval("bufwinnr(" + str(vimsql.DBListBuff) + ")"))
 
+    @staticmethod
     def show_results_window():
+        ''' . '''
         height = 10
 
         if not vimsql.ResultsBuff:
@@ -92,11 +95,11 @@ class vimsql(object):
             if database.active:
                 # Display table records:
                 for table in database.tables:
-                    results += "  - {}\n".format(table.name)
-                    if table.active:
+                    results += "  - {}\n".format(table.escapedname())
+                    if table.active and table.columns:
                         for column in table.columns:
-                            results += "    {} [{}]\n".format(column.name,
-                                                              column.sqltype)
+                            results += "    * ({}) {}\n".format(column.escapedname(),
+                                    column.sqltype)
 
         return results
 
@@ -121,8 +124,14 @@ class vimsql(object):
 
     @staticmethod
     def get_buffer(buffnbr):
+        ''' Returns a buffer object for the numbered buffer passed, or None if
+            it does not exist.
+        '''
+        # Ensure we are searching for what we're getting:
+        buffer_number = int(buffnbr)
+
         for buffer in vim.buffers:
-            if buffer.number == buffnbr:
+            if buffer.number == buffer_number:
                 return buffer
         return None
 
