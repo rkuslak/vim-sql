@@ -17,6 +17,7 @@ endif
 
 " Root path to this file:
 let g:vim_sql_script_path = expand('<sfile>:p:h')
+let g:vim_sql_script_path = g:vim_sql_script_path. "\\vim-sql\\"
 
 " Set import path to include plugin directory.
 py3 << py3eof
