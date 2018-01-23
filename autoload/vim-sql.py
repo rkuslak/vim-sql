@@ -46,9 +46,22 @@ class vimsql(object):
         '''
         # TODO: Make this configurable?
         width = 30
+        style_cmds = [
+            r'syn clear',
+            r'syntax match DBName /^\* \zs.*\ze$/',
+            r'syntax match SchemaName /- \[\zs[^\.\]]*\ze]/',
+            r'syntax match TableName /\.\[\zs[^\]]*\ze\]$/',
+            r'syntax match SqlType /(\zs.*\ze)/',
+            r'syntax match ColumnName /> \zs\w*\ze/',
+            r'highlight def link DBName Statement',
+            r'highlight def link SchemaName Constant',
+            r'highlight def link TableName Constant',
+            r'highlight def link ColumnName Type',
+            r'highlight def link SqlType Comment'
+        ]
 
         if not vimsql.DBListBuff:
-            vim.command("topleft vertical " + str(width) + " new")
+            vim.command("topleft vertical {} new".format(width))
             vim.command("edit VimSqlServerList")
             vim.command("setlocal buftype=nofile")
             vim.command("setlocal bufhidden=hide")
@@ -67,7 +80,9 @@ class vimsql(object):
                 vim.command("topleft vertical " + str(width) + " vsplit")
                 vim.command("b " + str(vimsql.DBListBuff))
 
-            print(vim.eval("bufwinnr(" + str(vimsql.DBListBuff) + ")"))
+        # Style the buffer if we have one:
+        for cmd in style_cmds:
+            vim.command(cmd)
 
     @staticmethod
     def show_results_window():
@@ -98,8 +113,8 @@ class vimsql(object):
                     results += "  - {}\n".format(table.escapedname())
                     if table.active and table.columns:
                         for column in table.columns:
-                            results += "    * ({}) {}\n".format(column.escapedname(),
-                                    column.sqltype)
+                            results += "    > {0} ({1})\n".format(column.name,
+                                                                column.sqltype)
 
         return results
 

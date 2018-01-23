@@ -23,7 +23,15 @@ _SYSTEM_TABLES = ["master", "tempdb", "model", "msdb"]
 class sqlrunner(object):
     def __init__(self, server=None, database=None, username=None,
                  password=None):
-        ''' XXX: Init for class '''
+        ''' Initializes class
+
+            @server = URL for server to connect to
+            @database = Database on server to default to for queries
+            @username = username to use during connection
+            @password = password for username
+# TODO:
+            @intergrated_sec = Use integrated security (on supported platforms)
+        '''
         self.buffer = None
 
         self.server = server
@@ -38,16 +46,6 @@ class sqlrunner(object):
                             password=self.password, as_dict=True)
 
         return sql
-
-    def setdatabase(self, database):
-        ''' Changes Sql instance to database value of class. '''
-        # TODO: this is unneeded as we've changed the connection model.
-        #   ensure we're not calling it and remove.
-        self.database = database
-
-        with self.connect() as sql:
-            with sql.cursor() as cursor:
-                cursor.execute("USE [" + database + "]")
 
     def execute(self, query):
         ''' Executes passsed query after spliting into batches and returns

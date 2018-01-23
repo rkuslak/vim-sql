@@ -33,3 +33,4 @@ exec "py3file ". g:vim_sql_script_path. "\\vim-sql.py"
 
 " Add commands we can keybind, to make life easier:
 command! -range VimSqlServers py3 vimsql.show_database_list() 
+map <leader>wq :VimSqlServer<cr>
