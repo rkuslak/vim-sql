@@ -57,7 +57,8 @@ class sqlrunner(object):
             with sql.cursor() as cursor:
                 # XXX: Break passed query into batches, and store results
                 #      in return valaue
-                cursor.execute(query)
+                cursor.execute("SELECT 'Foo'")
+                # cursor.execute(query)
 
                 results = cursor.fetchall()
 
