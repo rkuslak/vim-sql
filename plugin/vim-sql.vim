@@ -17,7 +17,7 @@ endif
 
 " Root path to this file:
 let g:vim_sql_script_path = expand('<sfile>:p:h')
-let g:vim_sql_script_path = g:vim_sql_script_path. "\\vim-sql\\"
+let g:vim_sql_script_path = g:vim_sql_script_path
 
 " Set import path to include plugin directory.
 py3 << py3eof
@@ -35,7 +35,7 @@ if VIM_SQL_SCRIPT_PATH not in sys.path:
 # vim.command("let g:vim_sql_script_path="+VIM_SQL_SCRIPT_PATH)
 py3eof
 
-
+let g:vim_sql_script_path = g:vim_sql_script_path. "\\vim-sql\\"
 exec "py3file ". g:vim_sql_script_path. "\\vim-sql.py"
 
 " Add commands we can keybind, to make life easier:

@@ -229,9 +229,17 @@ class vimsql(object):
         vimsql.show_results_window()
         buffer = vimsql.get_buffer(vimsql.ResultsBuff)
         buffer[:] = ['']
-        print(results)
 
         for resultset in results:
             # We have a list of dictonarys; iterate through and add to buffer:
-            for col in resultset.keys():
-                buffer.append(resultset[col])
+            colums = {}
+            row = ''
+
+            if isinstance(resultset, dict):
+                # Results are a dictonary; this is a query result
+                for col in resultset.keys():
+                    row += str(resultset[col]) + ', '
+                buffer.append(row)
+            else:
+                # Results is a array; it is the number of rows affected
+                buffer.append('{} rows affected.'.format(resultset))

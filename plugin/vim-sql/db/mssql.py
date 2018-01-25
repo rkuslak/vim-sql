@@ -51,16 +51,20 @@ class sqlrunner(object):
         ''' Executes passsed query after spliting into batches and returns
             list of dictonaries  of results.
         '''
-        results = None
+        results = []
 
         with self.connect() as sql:
             with sql.cursor() as cursor:
                 # XXX: Break passed query into batches, and store results
                 #      in return valaue
-                cursor.execute("SELECT 'Foo'")
-                # cursor.execute(query)
+                cursor.execute(query)
 
-                results = cursor.fetchall()
+                while results == [] or cursor.nextset():
+                    if cursor.rowcount == -1:
+                        # SELECT query, append results:
+                        results += cursor.fetchall()
+                    else:
+                        results += [cursor.rowcount]
 
         return results
 
