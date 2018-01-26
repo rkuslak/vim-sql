@@ -69,6 +69,8 @@ class vimsql(object):
             vim.command("setlocal bufhidden=hide")
             vim.command("setlocal noswapfile")
             vim.command("setlocal shiftwidth=2")
+            # vim.command("setlocal nonumbers")
+            # vim.command("setlocal norelativenumbers")
             vimsql.DBListBuff = vim.current.buffer.number
         else:
             if not vimsql.get_buffer(vimsql.DBListBuff):
@@ -77,10 +79,14 @@ class vimsql(object):
                 vimsql.DBListBuff = None
                 vimsql.show_dblist_window()
                 return
-            if vim.eval("bufwinnr(" + str(vimsql.DBListBuff) + ")") == "-1":
+            windowid = vim.eval("bufwinnr(" + str(vimsql.DBListBuff) + ")")
+            if windowid == "-1":
                 # Buffer exists, but is not shown on this tab. Fix that...
                 vim.command("topleft vertical " + str(width) + " vsplit")
                 vim.command("b " + str(vimsql.DBListBuff))
+            else:
+                # Buffer is show, go to that window
+                vim.command(windowid + "wincmd w")
 
         # Style the buffer if we have one:
         for cmd in style_cmds:

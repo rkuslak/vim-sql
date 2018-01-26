@@ -6,6 +6,10 @@
     across DB engines.
 '''
 
+class SqlExeception(Exception):
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, args, kwargs)
+
 class dbmodel(object):
     def escapedname(self):
         ''' Returns a escaped-version of the object name. '''
