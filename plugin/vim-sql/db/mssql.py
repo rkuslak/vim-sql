@@ -59,10 +59,12 @@ class sqlrunner(object):
                 #      in return valaue
                 cursor.execute(query)
 
+                # TODO: Result type indicators should really be some sort
+                #   of descriptive object from db.models or something.
                 while results == [] or cursor.nextset():
                     if cursor.rowcount == -1:
                         # SELECT query, append results:
-                        results += cursor.fetchall()
+                        results += [cursor.fetchall()]
                     else:
                         results += [cursor.rowcount]
 

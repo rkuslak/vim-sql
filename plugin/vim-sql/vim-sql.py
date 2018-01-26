@@ -9,6 +9,8 @@
 
     TODO: Convert to a class to keep things out of the global namespace.
 '''
+# TODO: Everything in here is scoped to module, no need to namespace to
+# class any more. Move out of class and into module namespace.
 import db.mssql
 import vim
 
@@ -142,7 +144,7 @@ class vimsql(object):
                     if table.active and table.columns:
                         for column in table.columns:
                             results += "    > {0} ({1})\n".format(column.name,
-                                                                column.sqltype)
+                                                                  column.sqltype)
 
         return results
 
@@ -224,22 +226,60 @@ class vimsql(object):
         query = '\n'.join(vim.current.buffer[:])
         connection = vimsql.get_connection()
 
-        results = connection.execute(query)
+        err = None
 
         vimsql.show_results_window()
         buffer = vimsql.get_buffer(vimsql.ResultsBuff)
         buffer[:] = ['']
 
+        results = connection.execute(query)
+        # TODO: Catching exception leave pytds in unrecoverable state! Need to
+        # close on error!
+        # try:
+        #     results = connection.execute(query)
+        # except Exception as ex:
+        #     buffer[:] = ex
+        #     return
+
         for resultset in results:
             # We have a list of dictonarys; iterate through and add to buffer:
             colums = {}
-            row = ''
 
-            if isinstance(resultset, dict):
-                # Results are a dictonary; this is a query result
-                for col in resultset.keys():
-                    row += str(resultset[col]) + ', '
-                buffer.append(row)
-            else:
+            if isinstance(resultset, int):
                 # Results is a array; it is the number of rows affected
                 buffer.append('{} rows affected.'.format(resultset))
+            else:
+                # Results are a dictonary; this is a query result
+                # Create a dictonary of row sizes:
+                columnsizes = {}
+                for row in resultset:
+                    for key in row.keys():
+                        columnsizes[key] = len(str(key))
+                    for key in row.keys():
+                        columnsize = len(str(row[key]))
+                        if columnsize > columnsizes[key]:
+                            columnsizes[key] = columnsize
+
+                # Make column header:
+                headersize  = sum(columnsizes.values())
+                headersize += len(columnsizes.values()) * 3
+
+                headerframe = ' +'
+                columnnameline = ' | '
+                for key in columnsizes.keys():
+                    # headerframe += str(key).ljust(columnsizes[key]) + ' | '
+                    columnsize = columnsizes[key] + 2
+                    headerframe += ('-' * columnsize) + '+'
+                    columnnameline += str(key).center(columnsizes[key]) + ' | '
+                buffer.append(headerframe)
+                buffer.append(columnnameline)
+                buffer.append(headerframe)
+
+                # Show results:
+                for row in resultset:
+                    bufferline = ' | '
+                    for key in row.keys():
+                        bufferline += str(row[key]).ljust(columnsizes[key]) + ' | '
+                    buffer.append(bufferline)
+                buffer.append(headerframe)
+                buffer.append('')
