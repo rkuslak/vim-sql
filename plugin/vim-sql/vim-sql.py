@@ -18,12 +18,44 @@ import vim
 class vimsql(object):
 
     # XXX: No longer globals. Reformat you fool!
-    CONNECTIONS = {}
+    # Should probably hook the calling buffers for close, so we can release
+    # these once the buffers are gone.
+    ServerResultCaches = {}
     LIST_BUFFERS = {}
     RESULTS_BUFFERS = {}
 
     ResultsBuff = None
     DBListBuff = None
+
+    @staticmethod
+    def style_current_buffer():
+        style_cmds = [
+            # Syntax Highlighting:
+            r'syn clear',
+            r'syntax match DBName /^\* \zs.*\ze$/',
+            r'syntax match SchemaName /- \[\zs[^\.\]]*\ze]/',
+            r'syntax match TableName /\.\[\zs[^\]]*\ze\]$/',
+            r'syntax match SqlType /(\zs.*\ze)/',
+            r'syntax match ColumnName /> \zs\w*\ze/',
+            r'highlight def link DBName Statement',
+            r'highlight def link SchemaName Constant',
+            r'highlight def link TableName Constant',
+            r'highlight def link ColumnName Type',
+            r'highlight def link SqlType Comment'
+            # Set state for UI on buffer:
+        ]
+
+        vim.command("setlocal buftype=nofile")
+        vim.command("setlocal bufhidden=hide")
+        vim.command("setlocal noswapfile")
+        vim.command("setlocal shiftwidth=2")
+        # vim.command("setlocal nonumbers")
+        # vim.command("setlocal norelativenumbers")
+
+        # Add syntax highlighting:
+        if vim.current.buffer.number == vimsql.DBListBuff:
+            for cmd in style_cmds:
+                vim.command(cmd)
 
     @staticmethod
     def get_vim_variable(var):
@@ -38,40 +70,16 @@ class vimsql(object):
     def show_dblist_window():
         ''' Create a Vim 'results' scratch buffer for the buffer named in
             parentname.
-
-            if creating, use:
-                :new
-                :setlocal buftype=nofile
-                :setlocal bufhidden=hide
-                :setlocal noswapfile
-                :autocmd BufEnter results_buffer_name stopinsert
         '''
-        # TODO: Make this configurable?
+        # TODO: Make width configurable?
         width = 30
-        style_cmds = [
-            r'syn clear',
-            r'syntax match DBName /^\* \zs.*\ze$/',
-            r'syntax match SchemaName /- \[\zs[^\.\]]*\ze]/',
-            r'syntax match TableName /\.\[\zs[^\]]*\ze\]$/',
-            r'syntax match SqlType /(\zs.*\ze)/',
-            r'syntax match ColumnName /> \zs\w*\ze/',
-            r'highlight def link DBName Statement',
-            r'highlight def link SchemaName Constant',
-            r'highlight def link TableName Constant',
-            r'highlight def link ColumnName Type',
-            r'highlight def link SqlType Comment'
-        ]
 
         if not vimsql.DBListBuff:
             vim.command("topleft vertical {} new".format(width))
             vim.command("edit VimSqlServerList")
-            vim.command("setlocal buftype=nofile")
-            vim.command("setlocal bufhidden=hide")
-            vim.command("setlocal noswapfile")
-            vim.command("setlocal shiftwidth=2")
-            # vim.command("setlocal nonumbers")
-            # vim.command("setlocal norelativenumbers")
             vimsql.DBListBuff = vim.current.buffer.number
+
+            vimsql.style_current_buffer()
         else:
             if not vimsql.get_buffer(vimsql.DBListBuff):
                 # We set the buffer, but it is no longer in existance.
@@ -88,36 +96,17 @@ class vimsql(object):
                 # Buffer is show, go to that window
                 vim.command(windowid + "wincmd w")
 
-        # Style the buffer if we have one:
-        for cmd in style_cmds:
-            vim.command(cmd)
-
     @staticmethod
     def show_results_window():
         ''' . '''
-        # TODO: Make this configurable?
+        # TODO: Make height configurable?
         height = 15
-        style_cmds = [
-            r'syn clear',
-            r'syntax match DBName /^\* \zs.*\ze$/',
-            r'syntax match SchemaName /- \[\zs[^\.\]]*\ze]/',
-            r'syntax match TableName /\.\[\zs[^\]]*\ze\]$/',
-            r'syntax match SqlType /(\zs.*\ze)/',
-            r'syntax match ColumnName /> \zs\w*\ze/',
-            r'highlight def link DBName Statement',
-            r'highlight def link SchemaName Constant',
-            r'highlight def link TableName Constant',
-            r'highlight def link ColumnName Type',
-            r'highlight def link SqlType Comment'
-        ]
 
         if not vimsql.ResultsBuff:
             vim.command("botright {}new VimSqlResults".format(height))
-            vim.command("setlocal buftype=nofile")
-            vim.command("setlocal bufhidden=hide")
-            vim.command("setlocal noswapfile")
-            vim.command("setlocal shiftwidth=2")
             vimsql.ResultsBuff = vim.current.buffer.number
+
+            vimsql.style_current_buffer()
         else:
             if not vimsql.get_buffer(vimsql.ResultsBuff):
                 # We set the buffer, but it is no longer in existance.
@@ -130,10 +119,6 @@ class vimsql(object):
                 vim.command("botright {}split ".format(height))
                 vim.command("b " + str(vimsql.ResultsBuff))
 
-        # Style the buffer if we have one:
-        for cmd in style_cmds:
-            vim.command(cmd)
-
     @staticmethod
     def get_formated_database_list(databases):
         ''' Takes passed list of db.models objects and creates a plesant
@@ -145,27 +130,19 @@ class vimsql(object):
             results += "* {}\n".format(database.name)
             if database.active:
                 # Display table records:
+                results += ' > Tables:\n'
                 for table in database.tables:
                     results += "  - {}\n".format(table.escapedname())
                     if table.active and table.columns:
-                        for column in table.columns:
-                            results += "    > {0} ({1})\n".format(column.name,
-                                                                  column.sqltype)
+                        for col in table.columns:
+                            results += "    > {0} ({1})\n".format(col.name,
+                                                                  col.sqltype)
 
         return results
 
     @staticmethod
     def get_connection():
         ''' Returns db.sqlRunner object for current buffer. '''
-        # connection = None
-        # buffer = vim.current.buffer
-
-        # # Attempt to find a conncetion for this buffer in the global cache:
-        # if buffer.number not in vimsql.CONNECTIONS.keys():
-        #     connection = db.mssql.sqlrunner()
-        #     vimsql.CONNECTIONS[buffer.number] = connection
-
-        # connection = vimsql.CONNECTIONS[buffer.number]
         connection = db.mssql.sqlrunner()
         connection.server = vimsql.get_vim_variable("vim_sql_server")
         connection.database = vimsql.get_vim_variable("vim_sql_database")
@@ -188,28 +165,32 @@ class vimsql(object):
         return None
 
     @staticmethod
-    def show_database_list():
+    def reload_database_cache():
         ''' Sets (or creates if non-existant) the contents of the database list
             buffer for the currently selected buffer to the values held in a
             query against the database.
         '''
-        # TODO: Need to see if already shown and reuse tab.
         connection = vimsql.get_connection()
-        vimsql.show_dblist_window()
         databases = connection.getdatabases()
 
+        # Cache the results so we can use it for completion:
+        vimsql.ServerResultCaches[vim.current.buffer.number] = databases
+
+    def show_database_list():
+        current_buffer = vim.current.buffer.number
+        vimsql.reload_database_cache()
+
+        vimsql.show_dblist_window()
+        databases = vimsql.ServerResultCaches[current_buffer]
         listbuff = vimsql.get_buffer(vimsql.DBListBuff)
         listbuff[:] = vimsql.get_formated_database_list(databases).split("\n")
 
     # TODO: This doesn't appear to do what the docstring says. Refactor?
     @staticmethod
     def get_dblist_buffer(parentbuff):
-        ''' Returns the database list for a buffer passed, if a editor window, or
-            for the connection if passed a list or results buffer
+        ''' Returns the database list for a buffer passed, if a editor window,
+            or for the connection if passed a list or results buffer
         '''
-        if parentbuff in vimsql.CONNECTIONS.keys():
-            return vimsql.CONNECTIONS[parentbuff]
-
         if parentbuff in vimsql.LIST_BUFFERS.values():
             return parentbuff
 
@@ -232,8 +213,6 @@ class vimsql(object):
         query = '\n'.join(vim.current.buffer[:])
         connection = vimsql.get_connection()
 
-        err = None
-
         vimsql.show_results_window()
         buffer = vimsql.get_buffer(vimsql.ResultsBuff)
         buffer[:] = ['']
@@ -249,8 +228,6 @@ class vimsql(object):
 
         for resultset in results:
             # We have a list of dictonarys; iterate through and add to buffer:
-            colums = {}
-
             if isinstance(resultset, int):
                 # Results is a array; it is the number of rows affected
                 buffer.append('{} rows affected.'.format(resultset))
@@ -288,7 +265,7 @@ class vimsql(object):
                 for row in resultset:
                     bufferline = ' | '
                     for key in row.keys():
-                        bufferline += str(row[key]).ljust(columnsizes[key]) + ' | '
+                        bufferline += str(row[key]).ljust(columnsizes[key])
+                        bufferline += ' | '
                     buffer.append(bufferline)
-                buffer.append(headerframe)
-                buffer.append('')
+                buffer.append([headerframe, ''])
