@@ -267,13 +267,16 @@ class vimsql(object):
                             columnsizes[key] = columnsize
 
                 # Make column header:
-                headersize  = sum(columnsizes.values())
+                headersize = sum(columnsizes.values())
                 headersize += len(columnsizes.values()) * 3
 
                 headerframe = ' +'
                 columnnameline = ' | '
+                # Add header sizes to columnsizes dictonary, and then
+                # build our table:
                 for key in columnsizes.keys():
-                    # headerframe += str(key).ljust(columnsizes[key]) + ' | '
+                    if len(str(key)) > columnsizes[key]:
+                        columnsizes[key] = len(str(key))
                     columnsize = columnsizes[key] + 2
                     headerframe += ('-' * columnsize) + '+'
                     columnnameline += str(key).center(columnsizes[key]) + ' | '
