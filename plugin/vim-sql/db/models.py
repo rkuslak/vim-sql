@@ -10,6 +10,10 @@ class SqlExeception(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, args, kwargs)
 
+class QueryException(SqlExeception):
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, args, kwargs)
+
 class dbmodel(object):
     def escapedname(self):
         ''' Returns a escaped-version of the object name. '''
@@ -17,14 +21,28 @@ class dbmodel(object):
 
 class database(dbmodel):
     ''' Container object for Database information: '''
-    def __init__(self, database, tables=None):
+    def __init__(self, database, tables=None, views=None):
         self.name = database
         self.tables = tables
+        self.views = views
         self.active = True
 
 
 class table(dbmodel):
     ''' Container object for Table information: '''
+    def __init__(self, name, schema="dbo", columns=None):
+        self.name = name
+        self.schema = schema
+        self.columns = columns
+        self.active = True
+
+    def escapedname(self):
+        ''' Returns a escaped-version of the object name. '''
+        return "[" + self.schema + "].[" + self.name + "]"
+
+
+class view(dbmodel):
+    ''' Container object for View information: '''
     def __init__(self, name, schema="dbo", columns=None):
         self.name = name
         self.schema = schema

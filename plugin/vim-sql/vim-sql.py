@@ -11,6 +11,7 @@
 '''
 # TODO: Everything in here is scoped to module, no need to namespace to
 # class any more. Move out of class and into module namespace.
+import db.models
 import db.mssql
 import vim
 
@@ -137,6 +138,13 @@ class vimsql(object):
                         for col in table.columns:
                             results += "    > {0} ({1})\n".format(col.name,
                                                                   col.sqltype)
+                # Display view records
+                for view in database.views:
+                    results += "  - {}\n".format(view.escapedname())
+                    if view.active and view.columns:
+                        for col in view.columns:
+                            results += "    > {0} ({1})\n".format(col.name,
+                                                                  col.sqltype)
 
         return results
 
@@ -215,16 +223,14 @@ class vimsql(object):
 
         vimsql.show_results_window()
         buffer = vimsql.get_buffer(vimsql.ResultsBuff)
-        buffer[:] = ['']
+        # buffer[:] = ['']
+        buffer.append('')
 
-        results = connection.execute(query)
-        # TODO: Catching exception leave pytds in unrecoverable state! Need to
-        # close on error!
-        # try:
-        #     results = connection.execute(query)
-        # except Exception as ex:
-        #     buffer[:] = ex
-        #     return
+        try:
+            results = connection.execute(query)
+        except db.models.QueryException as ex:
+            buffer.append(str(ex))
+            return
 
         for resultset in results:
             # We have a list of dictonarys; iterate through and add to buffer:

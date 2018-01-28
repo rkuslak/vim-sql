@@ -6,11 +6,7 @@
     A Python program to talk to a described Microsoft SQL Server, at least 2008
     or higher.
 
-    TODO: Parameterize the calls in the database/table/column functions to
-        avoid injection. Ex:
-
-        SET @TableID INT = OBJECT_ID(Table)
-        SET @Query VARCHAR(MAX) =  'SELECT FOO FROM ' + OBJECT_NAME(@TableID)
+    TODO: Parameterize the call to set the database?
     TODO: All the exception handling!
 '''
 import pytds
@@ -39,25 +35,39 @@ class sqlrunner(object):
         self.username = username
         self.password = password
 
-    def connect(self):
+    def connect(self, connection_database = None):
         ''' Connects to the server set via class variables '''
-        sql = pytds.connect(database=self.database or "master",
-                            server=self.server, user=self.username,
-                            password=self.password, as_dict=True)
+        db = connection_database or self.database or "master"
+        sql = pytds.connect(database=db, server=self.server,
+                            user=self.username, password=self.password,
+                            as_dict=True)
 
         return sql
 
-    def execute(self, query):
+    def execute(self, query, params=None, database=None):
         ''' Executes passsed query after spliting into batches and returns
             list of dictonaries  of results.
         '''
         results = []
 
         with self.connect() as sql:
-            with sql.cursor() as cursor:
+            try:
+                cursor = sql.cursor()
+            except:
+                sql.close()
+                raise models.SqlExeception
+
+            try:
+                # Set database at start of query to passed database
+                db = database or self.database or "master"
+                cursor.execute("USE [" + db + "]")
+
                 # XXX: Break passed query into batches, and store results
                 #      in return valaue
-                cursor.execute(query)
+                if (params):
+                    cursor.execute(query, params=params)
+                else:
+                    cursor.execute(query)
 
                 # TODO: Result type indicators should really be some sort
                 #   of descriptive object from db.models or something.
@@ -67,6 +77,11 @@ class sqlrunner(object):
                         results += [cursor.fetchall()]
                     else:
                         results += [cursor.rowcount]
+            # except Exception as ex:
+            except pytds.tds_base.ProgrammingError as ex:
+                raise models.QueryException("Query failed: {}".format(ex))
+            finally:
+                cursor.close()
 
         return results
 
@@ -76,18 +91,15 @@ class sqlrunner(object):
         results = []
         databases = []
 
-        with self.connect() as sql:
-            with sql.cursor() as cursor:
-                cursor.execute("SELECT name FROM sys.databases")
-                for row in cursor.fetchall():
-                    # TODO: There has to be a better, "cleaner" way to do this.
-                    # Maybe use sys.objects? It's deprecated but still...
-                    if include_system or row['name'] not in _SYSTEM_TABLES:
-                        databases += [row["name"]]
+        queryresults = self.execute("SELECT name FROM sys.databases")
+        for row in queryresults[0]:
+            if include_system or row['name'] not in _SYSTEM_TABLES:
+                databases += [row["name"]]
 
-                for database in databases:
-                    results += [models.database(database,
-                                                self.gettables(database))]
+        for database in databases:
+            tables = self.gettables(database)
+            views = self.getviews(database)
+            results += [models.database(database, tables, views)]
 
         return results
 
@@ -95,43 +107,55 @@ class sqlrunner(object):
         ''' Returns the tables with columns for database passed '''
         tables = []
 
-        with self.connect() as sql:
-            with sql.cursor() as cursor:
-                cursor.execute("SELECT DB_NAME(3) AS dbname")
+        query = ("SELECT TABLE_SCHEMA, TABLE_NAME " +
+                 "FROM INFORMATION_SCHEMA.TABLES " +
+                 "WHERE TABLE_TYPE = 'BASE TABLE'")
 
-                cursor.execute("USE [" + database + "]")
-                cursor.execute("SELECT TABLE_SCHEMA, TABLE_NAME FROM " +
-                               "INFORMATION_SCHEMA.TABLES WHERE " +
-                               "TABLE_TYPE = 'BASE TABLE'",
-                               {"database": database})
-
-                for table in cursor.fetchall():
-                    tablename = table["TABLE_NAME"]
-                    schema = table["TABLE_SCHEMA"]
-                    columns = self.getcolumns(database, tablename, schema)
-                    tables += [models.table(tablename, schema, columns)]
+        queryresults = self.execute(query=query, database=database)
+        print(queryresults)
+        for table in queryresults[0]:
+            tablename = table["TABLE_NAME"]
+            schema = table["TABLE_SCHEMA"]
+            columns = self.getcolumns(database, tablename, schema)
+            tables += [models.table(tablename, schema, columns)]
 
         return tables
+
+    def getviews(self, database):
+        ''' Returns the views with columns for database passed '''
+        views = []
+
+        query = ("SELECT TABLE_SCHEMA, TABLE_NAME " +
+                 "FROM INFORMATION_SCHEMA.VIEWS ")
+
+        queryresults = self.execute(query=query, database=database)
+        print(queryresults)
+        for view in queryresults[0]:
+            viewname = view["TABLE_NAME"]
+            schema = view["TABLE_SCHEMA"]
+            columns = self.getcolumns(database, viewname, schema)
+            views += [models.view(viewname, schema, columns)]
+
+        return views
 
     def getcolumns(self, database, table, schema):
         ''' Returns the columns for table within database passed '''
         columns = []
 
-        with self.connect() as sql:
-            with sql.cursor() as cursor:
-                cursor.execute("USE [" + database + "]")
-                cursor.execute("SELECT COLUMN_NAME AS [Column], "
-                               "IS_NULLABLE AS [Nullable], "
-                               "DATA_TYPE AS Datatype "
-                               "FROM INFORMATION_SCHEMA.COLUMNS "
-                               "WHERE TABLE_NAME LIKE @table AND "
-                               "    TABLE_SCHEMA LIKE @schema",
-                               {"table": table, "schema": schema})
-                for row in cursor.fetchall():
-                    columnname = row["Column"]
-                    nullable = row["Nullable"] == 'YES'
-                    sqltype = row["Datatype"]
+        query = ("SELECT COLUMN_NAME AS [Column],"
+                 "  IS_NULLABLE AS [Nullable],"
+                 "  DATA_TYPE AS Datatype "
+                 "FROM INFORMATION_SCHEMA.COLUMNS "
+                 "WHERE TABLE_NAME LIKE @table AND "
+                 "    TABLE_SCHEMA LIKE @schema")
+        params = {"table": table, "schema": schema}
+        results = self.execute(query=query, params=params,
+                               database=database)
+        for row in results[0]:
+            columnname = row["Column"]
+            nullable = row["Nullable"] == 'YES'
+            sqltype = row["Datatype"]
 
-                    columns += [models.column(columnname, nullable, sqltype)]
+            columns += [models.column(columnname, nullable, sqltype)]
 
         return columns
