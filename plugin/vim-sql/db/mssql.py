@@ -6,8 +6,9 @@
     A Python program to talk to a described Microsoft SQL Server, at least 2008
     or higher.
 
-    TODO: Parameterize the call to set the database?
     TODO: All the exception handling!
+    TODO: Print statements in query currently unhandled.
+    TODO: Dropping tables/databases does not work as expected, or at all.
 '''
 import pytds
 from . import models
@@ -35,36 +36,40 @@ class sqlrunner(object):
         self.username = username
         self.password = password
 
-    def connect(self, connection_database = None):
+    def connect(self, database=None):
         ''' Connects to the server set via class variables '''
-        db = connection_database or self.database or "master"
+        db = database or self.database or "master"
         sql = pytds.connect(database=db, server=self.server,
                             user=self.username, password=self.password,
                             as_dict=True)
 
         return sql
 
-    def execute(self, query, params=None, database=None):
+    def execute(self, query, params=None, database=None,
+                persistdatabase=False):
         ''' Executes passsed query after spliting into batches and returns
             list of dictonaries  of results.
+
+            @query: String of the query to run
+            @params: Query variables to replace in query in the form of a
+                dict formated "@var_name": "value"
+            @database: database, other than class global, to connect to
+            @persistdatabase: wether to persist current database after query
+                as class global database after query execution.
         '''
         results = []
 
-        with self.connect() as sql:
+        with self.connect(database=database) as sql:
             try:
                 cursor = sql.cursor()
-            except:
+            except Exception as ex:
                 sql.close()
                 raise models.SqlExeception
 
             try:
-                # Set database at start of query to passed database
-                db = database or self.database or "master"
-                cursor.execute("USE [" + db + "]")
-
                 # XXX: Break passed query into batches, and store results
                 #      in return valaue
-                if (params):
+                if params:
                     cursor.execute(query, params=params)
                 else:
                     cursor.execute(query)
@@ -77,6 +82,11 @@ class sqlrunner(object):
                         results += [cursor.fetchall()]
                     else:
                         results += [cursor.rowcount]
+
+                if persistdatabase:
+                    # TODO: This would be nice to have. Please add.
+                    currentdatabase = cursor.execute("SELECT DB_NAME()")
+
             # except Exception as ex:
             except pytds.tds_base.ProgrammingError as ex:
                 raise models.QueryException("Query failed: {}".format(ex))
@@ -91,7 +101,8 @@ class sqlrunner(object):
         results = []
         databases = []
 
-        queryresults = self.execute("SELECT name FROM sys.databases")
+        queryresults = self.execute("SELECT name FROM sys.databases",
+                                    database='master')
         for row in queryresults[0]:
             if include_system or row['name'] not in _SYSTEM_TABLES:
                 databases += [row["name"]]
@@ -112,7 +123,6 @@ class sqlrunner(object):
                  "WHERE TABLE_TYPE = 'BASE TABLE'")
 
         queryresults = self.execute(query=query, database=database)
-        print(queryresults)
         for table in queryresults[0]:
             tablename = table["TABLE_NAME"]
             schema = table["TABLE_SCHEMA"]
@@ -129,7 +139,6 @@ class sqlrunner(object):
                  "FROM INFORMATION_SCHEMA.VIEWS ")
 
         queryresults = self.execute(query=query, database=database)
-        print(queryresults)
         for view in queryresults[0]:
             viewname = view["TABLE_NAME"]
             schema = view["TABLE_SCHEMA"]
