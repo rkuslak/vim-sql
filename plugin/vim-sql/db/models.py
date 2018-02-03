@@ -14,6 +14,10 @@ class QueryException(SqlExeception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, args, kwargs)
 
+class ResultType(object):
+    ROWS_AFFECTED = 1
+    TABLE = 2
+
 class dbmodel(object):
     def escapedname(self):
         ''' Returns a escaped-version of the object name. '''

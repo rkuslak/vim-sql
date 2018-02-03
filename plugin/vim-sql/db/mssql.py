@@ -77,11 +77,23 @@ class sqlrunner(object):
                 # TODO: Result type indicators should really be some sort
                 #   of descriptive object from db.models or something.
                 while results == [] or cursor.nextset():
+
                     if cursor.rowcount == -1:
-                        # SELECT query, append results:
-                        results += [cursor.fetchall()]
+                        # results += [cursor.fetchall()]
+                        table = []
+                        result = cursor.fetchone()
+                        while result:
+                            table += [result]
+                            result = cursor.fetchone()
+                        if table:
+                            results += [[models.ResultType.TABLE, table]]
                     else:
-                        results += [cursor.rowcount]
+                        # results += [cursor.rowcount]
+                        results += [[models.ResultType.ROWS_AFFECTED,
+                                     cursor.rowcount]]
+
+
+                sql.commit()
 
                 if persistdatabase:
                     # TODO: This would be nice to have. Please add.
@@ -103,9 +115,13 @@ class sqlrunner(object):
 
         queryresults = self.execute("SELECT name FROM sys.databases",
                                     database='master')
-        for row in queryresults[0]:
-            if include_system or row['name'] not in _SYSTEM_TABLES:
-                databases += [row["name"]]
+        for result in queryresults:
+            if result[0] == models.ResultType.TABLE:
+                for row in result[1]:
+            # if queryresults[0][0] == models.ResultType.TABLE:
+            #     for row in queryresults[0]:
+                    if include_system or row['name'] not in _SYSTEM_TABLES:
+                        databases += [row["name"]]
 
         for database in databases:
             tables = self.gettables(database)
@@ -123,11 +139,13 @@ class sqlrunner(object):
                  "WHERE TABLE_TYPE = 'BASE TABLE'")
 
         queryresults = self.execute(query=query, database=database)
-        for table in queryresults[0]:
-            tablename = table["TABLE_NAME"]
-            schema = table["TABLE_SCHEMA"]
-            columns = self.getcolumns(database, tablename, schema)
-            tables += [models.table(tablename, schema, columns)]
+        for result in queryresults:
+            if result[0] == models.ResultType.TABLE:
+                for table in result[1]:
+                    tablename = table["TABLE_NAME"]
+                    schema = table["TABLE_SCHEMA"]
+                    columns = self.getcolumns(database, tablename, schema)
+                    tables += [models.table(tablename, schema, columns)]
 
         return tables
 
@@ -139,11 +157,15 @@ class sqlrunner(object):
                  "FROM INFORMATION_SCHEMA.VIEWS ")
 
         queryresults = self.execute(query=query, database=database)
-        for view in queryresults[0]:
-            viewname = view["TABLE_NAME"]
-            schema = view["TABLE_SCHEMA"]
-            columns = self.getcolumns(database, viewname, schema)
-            views += [models.view(viewname, schema, columns)]
+        # for view in queryresults:
+        #     if isinstance(view, dict):
+        for result in queryresults:
+            if result[0] == models.ResultType.TABLE:
+                for view in result[1]:
+                    viewname = view["TABLE_NAME"]
+                    schema = view["TABLE_SCHEMA"]
+                    columns = self.getcolumns(database, viewname, schema)
+                    views += [models.view(viewname, schema, columns)]
 
         return views
 
@@ -158,13 +180,16 @@ class sqlrunner(object):
                  "WHERE TABLE_NAME LIKE @table AND "
                  "    TABLE_SCHEMA LIKE @schema")
         params = {"table": table, "schema": schema}
-        results = self.execute(query=query, params=params,
-                               database=database)
-        for row in results[0]:
-            columnname = row["Column"]
-            nullable = row["Nullable"] == 'YES'
-            sqltype = row["Datatype"]
+        queryresults = self.execute(query=query, params=params,
+                                    database=database)
+        for result in queryresults:
+            if result[0] == models.ResultType.TABLE:
+                # for row in results[0]:
+                for row in result[1]:
+                    columnname = row["Column"]
+                    nullable = row["Nullable"] == 'YES'
+                    sqltype = row["Datatype"]
+                    columns += [models.column(columnname, nullable, sqltype)]
 
-            columns += [models.column(columnname, nullable, sqltype)]
 
         return columns
