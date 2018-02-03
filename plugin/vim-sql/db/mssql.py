@@ -1,12 +1,11 @@
 #!/usr/bin/python3
 '''
-    TDS Talker
+    vim-sql
     Copyright 2018 Ron Kuslak, All Rights Reserved.
 
     A Python program to talk to a described Microsoft SQL Server, at least 2008
     or higher.
 
-    TODO: All the exception handling!
     TODO: Print statements in query currently unhandled.
     TODO: Dropping tables/databases does not work as expected, or at all.
 '''
@@ -73,37 +72,32 @@ class sqlrunner(object):
                     cursor.execute(query, params=params)
                 else:
                     cursor.execute(query)
+            except Exception as ex:
+                cursor.close()
+                raise models.QueryException("Query failed: {}".format(ex))
 
-                # TODO: Result type indicators should really be some sort
-                #   of descriptive object from db.models or something.
-                while results == [] or cursor.nextset():
-
+            has_rows = True
+            while has_rows == True:
+                # Need to catch exceptions as no means to determine if
+                # result set sent:
+                # TODO: See if means to test for result
+                try:
                     if cursor.rowcount == -1:
-                        # results += [cursor.fetchall()]
-                        table = []
-                        result = cursor.fetchone()
-                        while result:
-                            table += [result]
-                            result = cursor.fetchone()
-                        if table:
-                            results += [[models.ResultType.TABLE, table]]
+                            results += [[models.ResultType.TABLE, cursor.fetchall()]]
                     else:
-                        # results += [cursor.rowcount]
                         results += [[models.ResultType.ROWS_AFFECTED,
                                      cursor.rowcount]]
+                    has_rows = cursor.nextset()
+                except Exception:
+                    has_rows = False
 
+            sql.commit()
 
-                sql.commit()
+            if persistdatabase:
+                # TODO: This would be nice to have. Please add.
+                currentdatabase = cursor.execute("SELECT DB_NAME()")
 
-                if persistdatabase:
-                    # TODO: This would be nice to have. Please add.
-                    currentdatabase = cursor.execute("SELECT DB_NAME()")
-
-            # except Exception as ex:
-            except pytds.tds_base.ProgrammingError as ex:
-                raise models.QueryException("Query failed: {}".format(ex))
-            finally:
-                cursor.close()
+            cursor.close()
 
         return results
 
@@ -118,8 +112,6 @@ class sqlrunner(object):
         for result in queryresults:
             if result[0] == models.ResultType.TABLE:
                 for row in result[1]:
-            # if queryresults[0][0] == models.ResultType.TABLE:
-            #     for row in queryresults[0]:
                     if include_system or row['name'] not in _SYSTEM_TABLES:
                         databases += [row["name"]]
 
@@ -157,8 +149,6 @@ class sqlrunner(object):
                  "FROM INFORMATION_SCHEMA.VIEWS ")
 
         queryresults = self.execute(query=query, database=database)
-        # for view in queryresults:
-        #     if isinstance(view, dict):
         for result in queryresults:
             if result[0] == models.ResultType.TABLE:
                 for view in result[1]:
@@ -184,7 +174,6 @@ class sqlrunner(object):
                                     database=database)
         for result in queryresults:
             if result[0] == models.ResultType.TABLE:
-                # for row in results[0]:
                 for row in result[1]:
                     columnname = row["Column"]
                     nullable = row["Nullable"] == 'YES'

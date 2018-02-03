@@ -234,14 +234,16 @@ class vimsql(object):
 
         for resultset in results:
             # We have a list of dictonarys; iterate through and add to buffer:
-            if isinstance(resultset, int):
+            # if isinstance(resultset, int):
+            if resultset[0] == db.models.ResultType.ROWS_AFFECTED:
                 # Results is a array; it is the number of rows affected
-                buffer.append('{} rows affected.'.format(resultset))
-            else:
+                buffer.append('{} rows affected.'.format(resultset[1]))
+            if resultset[0] == db.models.ResultType.TABLE:
+            # else:
                 # Results are a dictonary; this is a query result
                 # Create a dictonary of row sizes:
                 columnsizes = {}
-                for row in resultset:
+                for row in resultset[1]:
                     for key in row.keys():
                         columnsizes[key] = len(str(key))
                     for key in row.keys():
@@ -268,7 +270,7 @@ class vimsql(object):
                 buffer.append(headerframe)
 
                 # Show results:
-                for row in resultset:
+                for row in resultset[1]:
                     bufferline = ' | '
                     for key in row.keys():
                         bufferline += str(row[key]).ljust(columnsizes[key])
