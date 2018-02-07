@@ -53,4 +53,3 @@ command! -range VimSqlExecuteBuffer py3 vimsql.execute_buffer()
 map <leader>wq :VimSqlServer<cr>
 map <leader>ww :VimSqlExecuteBuffer<cr>
 
-so ~/.config/nvim/secrets.vim
